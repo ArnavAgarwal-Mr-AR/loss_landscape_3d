@@ -6,8 +6,13 @@
 
 `loss-landscape-3d` is a lightweight, high-performance PyTorch library that samples the weight space of neural networks to generate interactive 3D visualizations of their loss landscapes.
 
+<p align="center">
+  <img src="assets/loss_landscape_3d.png" width="49%" alt="Actual 3D Loss Landscape">
+  <img src="assets/loss_landscape_contours.png" width="49%" alt="Actual 2D Loss Contours">
+</p>
+
 With this library, you can easily:
-*   Evaluate local geometry around a model's minimum using **filter-wise normalization** (Li et al., 2018) to prevent scale-invariance distortions.
+*   Evaluate local geometry around a model's minimum using **filter-wise normalization** to prevent scale-invariance distortions.
 *   Track the exact trajectory your optimizer (e.g., SGD, Adam, RMSprop) took during training.
 *   Project high-dimensional optimization trajectories into a 2D coordinate system using an optimized **Gram-matrix SVD** method that works in seconds even for models with millions of parameters.
 *   Generate interactive, beautiful 3D Plotly surface charts showing the optimizer's path down the "loss mountain," highlighting concepts like local minima, saddle points, and flatness.
@@ -157,6 +162,12 @@ visualizer.plot_3d_plotly(
     save_path="trajectory_3d.html"
 )
 ```
+
+### 1D Linear Mode Connectivity (LMC) Path Plot
+Additionally, you can calculate and plot the 1D path loss barrier between the initial and final states:
+<p align="center">
+  <img src="assets/lmc_path_1d.png" width="75%" alt="Actual 1D Mode Connectivity Path">
+</p>
 
 ---
 
