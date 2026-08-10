@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "loss-landscape-3d"
+name = "loss_landscape_3d"
 version = "0.1.0"
 description = "A library for sampling weight spaces and visualizing PyTorch model loss landscapes and optimization trajectories in interactive 3D."
 authors = [
