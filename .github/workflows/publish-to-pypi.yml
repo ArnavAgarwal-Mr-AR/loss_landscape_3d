@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   test-and-build:
@@ -63,6 +64,7 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
           # Authenticate using TestPyPI API Token stored in GitHub Repository Secrets
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          verbose: true
 
   publish-to-pypi:
     name: Publish to PyPI
@@ -82,3 +84,4 @@ jobs:
         with:
           # Authenticate using PyPI API Token stored in GitHub Repository Secrets
           password: ${{ secrets.PYPI_API_TOKEN }}
+          verbose: true
