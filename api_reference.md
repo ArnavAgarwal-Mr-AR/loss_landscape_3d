@@ -138,13 +138,16 @@ def __init__(self, x_coords, y_coords, loss_grid):
 *   `loss_grid` (*np.ndarray*): The 2D grid of loss values (from `LossLandscapeCalculator.calculate`).
 
 #### Methods:
-*   `plot_3d_plotly(trajectory_coords=None, trajectory_losses=None, title="Loss Landscape 3D", theme='dark', save_path=None)`:
+*   `plot_3d_plotly(trajectory_coords=None, trajectory_losses=None, title="Loss Landscape 3D", theme='dark', save_path=None, color_by='loss', log_scale=False, show_floor_contours=True)`:
     Renders an interactive 3D surface plot using Plotly.
     *   `trajectory_coords` (*list of tuple*, optional): List of $(x, y)$ coordinate points representing the optimizer's path.
     *   `trajectory_losses` (*list of float*, optional): Loss values corresponding to each trajectory point.
     *   `title` (*str*, default=`"Loss Landscape 3D"`): Title of the plot.
     *   `theme` (*str*, default=`'dark'`): Visual theme, `'dark'` or `'light'`.
     *   `save_path` (*str*, optional): Filepath to save the interactive HTML graph.
+    *   `color_by` (*str*, default=`'loss'`): Surface coloring criteria: `'loss'` (height values) or `'gradient'` (steepness/numerical gradient norm values, which highlights sharpness).
+    *   `log_scale` (*bool*, default=`False`): If `True`, applies log10 scaling to the loss surface and path values (stretches fine details near local minimum basin).
+    *   `show_floor_contours` (*bool*, default=`True`): If `True`, projects a 2D contour map on the bottom plane (floor) of the 3D plot to act as a spatial reference shadow.
     *   *Returns*: A `plotly.graph_objects.Figure` object.
 *   `plot_3d_matplotlib(trajectory_coords=None, trajectory_losses=None, title="Loss Landscape 3D", theme='light', save_path=None)`:
     Renders a static 3D surface plot using Matplotlib. Safe for headless environments (automatically falls back to `'Agg'` backend if Tkinter GUI fails to initialize).

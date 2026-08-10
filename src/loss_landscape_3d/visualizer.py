@@ -42,7 +42,8 @@ class LossLandscapeVisualizer:
                 )
 
     def plot_3d_plotly(self, trajectory_coords=None, trajectory_losses=None, 
-                       title="Loss Landscape 3D", theme='dark', save_path=None):
+                       title="Loss Landscape 3D", theme='dark', save_path=None,
+                       color_by='loss', log_scale=False, show_floor_contours=True):
         """
         Generates an interactive 3D surface plot using Plotly, with an optional
         optimization path overlay.
@@ -53,6 +54,9 @@ class LossLandscapeVisualizer:
             title (str): Title of the plot.
             theme (str): Plotly template, 'dark' (default) or 'light'.
             save_path (str, optional): Path to save the interactive HTML file.
+            color_by (str): Coloring criteria for the surface: 'loss' (default) or 'gradient' (steepness).
+            log_scale (bool): If True, applies log10 scaling to the loss values.
+            show_floor_contours (bool): If True, projects a 2D contour map on the bottom floor.
             
         Returns:
             plotly.graph_objects.Figure: The generated Plotly figure object.
@@ -65,18 +69,64 @@ class LossLandscapeVisualizer:
         # Transpose the loss_grid to match Plotly's (y, x) row-col indexing convention
         z_surface = self.loss_grid.T
         
+        # Determine minimum shift for log scale
+        z_min = np.min(z_surface)
+        shift = 0.0
+        if log_scale:
+            if z_min <= 0:
+                shift = -z_min + 1.0
+                z_surface = np.log10(z_surface + shift)
+            else:
+                z_surface = np.log10(z_surface)
+        
+        # Color mapping configuration
+        if color_by == 'gradient':
+            # Compute numerical gradient norm
+            grad_y, grad_x = np.gradient(self.loss_grid)
+            grad_norm = np.sqrt(grad_x**2 + grad_y**2)
+            surfacecolor = grad_norm.T
+            colorbar_title = "Gradient Norm (Steepness)"
+            colorscale = 'Jet' if theme == 'dark' else 'Turbo'
+        else:
+            surfacecolor = z_surface
+            colorbar_title = "Log10(Loss)" if log_scale else "Loss Value"
+            colorscale = 'Viridis' if theme == 'dark' else 'Plasma'
+            
+        # Floor contours projection
+        contours_config = {}
+        if show_floor_contours:
+            contours_config = dict(
+                z=dict(
+                    show=True,
+                    usecolormap=True,
+                    highlightcolor="white",
+                    project=dict(z=True)
+                )
+            )
+            
+        # Specular reflection for metallic 3D feel
+        lighting_config = dict(
+            ambient=0.65,
+            diffuse=0.85,
+            roughness=0.4,
+            specular=1.2,
+            fresnel=0.4
+        )
+        
         fig = go.Figure()
         
         # Add surface trace
-        colorscale = 'Viridis' if theme == 'dark' else 'Plasma'
         fig.add_trace(go.Surface(
             x=self.x_coords,
             y=self.y_coords,
             z=z_surface,
+            surfacecolor=surfacecolor,
             colorscale=colorscale,
             name='Loss Surface',
-            colorbar=dict(title='Loss Value', thickness=15),
-            hovertemplate='X: %{x:.4f}<br>Y: %{y:.4f}<br>Loss: %{z:.4f}<extra></extra>'
+            contours=contours_config,
+            lighting=lighting_config,
+            colorbar=dict(title=colorbar_title, thickness=15),
+            hovertemplate='X: %{x:.4f}<br>Y: %{y:.4f}<br>Z Value: %{z:.4f}<extra></extra>'
         ))
         
         # Add trajectory if provided
@@ -84,30 +134,43 @@ class LossLandscapeVisualizer:
             traj_x = [pt[0] for pt in trajectory_coords]
             traj_y = [pt[1] for pt in trajectory_coords]
             
-            # Use provided losses, or default to a flat plane or lookups
+            # Use provided losses or default to average height
             if trajectory_losses is not None:
-                traj_z = list(trajectory_losses)
+                traj_z = np.array(trajectory_losses)
+                if log_scale:
+                    traj_z = np.log10(traj_z + shift) if shift > 0.0 else np.log10(traj_z)
+                traj_z = list(traj_z)
             else:
-                # Fallback: estimate loss by interpolating on the grid
-                traj_z = [float(np.mean(self.loss_grid))] * len(trajectory_coords)
+                traj_z = [float(np.mean(z_surface))] * len(trajectory_coords)
                 
+            steps = list(range(len(trajectory_coords)))
+            
+            # Path trace with timeline gradient
             fig.add_trace(go.Scatter3d(
                 x=traj_x,
                 y=traj_y,
                 z=traj_z,
                 mode='lines+markers',
                 line=dict(
-                    color='#FF3366', # Bright neon red/pink
-                    width=6
+                    color='rgba(255, 255, 255, 0.4)' if theme == 'dark' else 'rgba(0, 0, 0, 0.3)',
+                    width=4
                 ),
                 marker=dict(
-                    size=5,
-                    color='#990033',
-                    symbol='circle',
+                    size=5.5,
+                    color=steps,
+                    colorscale='YlOrRd', # Sequential progression coloring (initial steps are yellow, final minimum is red)
+                    showscale=True,
+                    colorbar=dict(
+                        title="Optimizer Step",
+                        thickness=10,
+                        len=0.4,
+                        x=1.15,
+                        y=0.3
+                    ),
                     line=dict(color='white', width=1)
                 ),
                 name='Optimizer Path',
-                hovertemplate='Step: %{hovertext}<br>X: %{x:.4f}<br>Y: %{y:.4f}<br>Loss: %{z:.4f}<extra></extra>',
+                hovertemplate='Step: %{hovertext}<br>X: %{x:.4f}<br>Y: %{y:.4f}<br>Z Value: %{z:.4f}<extra></extra>',
                 hovertext=[str(i) for i in range(len(trajectory_coords))]
             ))
             
@@ -115,7 +178,7 @@ class LossLandscapeVisualizer:
             fig.add_trace(go.Scatter3d(
                 x=[traj_x[0]], y=[traj_y[0]], z=[traj_z[0]],
                 mode='markers',
-                marker=dict(size=8, color='#FF9900', symbol='diamond'),
+                marker=dict(size=9, color='#FFCC00', symbol='diamond', line=dict(color='white', width=1.5)),
                 name='Start (Init)',
                 hovertemplate='Initialization Point<extra></extra>'
             ))
@@ -123,7 +186,7 @@ class LossLandscapeVisualizer:
             fig.add_trace(go.Scatter3d(
                 x=[traj_x[-1]], y=[traj_y[-1]], z=[traj_z[-1]],
                 mode='markers',
-                marker=dict(size=8, color='#00FFCC', symbol='square'),
+                marker=dict(size=9, color='#00FFCC', symbol='square', line=dict(color='white', width=1.5)),
                 name='End (Min)',
                 hovertemplate='Final Point (Minimum)<extra></extra>'
             ))
@@ -132,6 +195,7 @@ class LossLandscapeVisualizer:
         template = 'plotly_dark' if theme == 'dark' else 'plotly_white'
         font_color = 'white' if theme == 'dark' else 'black'
         grid_color = 'rgba(128,128,128,0.2)'
+        z_title = 'Loss (Log10)' if log_scale else 'Loss'
         
         fig.update_layout(
             title=dict(
@@ -155,7 +219,7 @@ class LossLandscapeVisualizer:
                     backgroundcolor='rgba(0,0,0,0)' if theme == 'dark' else 'rgba(255,255,255,0)'
                 ),
                 zaxis=dict(
-                    title='Loss',
+                    title=z_title,
                     gridcolor=grid_color,
                     zerolinecolor=grid_color,
                     backgroundcolor='rgba(0,0,0,0)' if theme == 'dark' else 'rgba(255,255,255,0)'

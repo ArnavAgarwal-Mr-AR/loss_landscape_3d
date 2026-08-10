@@ -31,6 +31,18 @@ def test_visualizer_plotly():
     assert len(fig.data) == 4
     assert fig.layout.title.text == "Test Plotly Landscape"
 
+    # Test new premium visualization features
+    fig_gradient = visualizer.plot_3d_plotly(
+        trajectory_coords=trajectory_coords,
+        trajectory_losses=trajectory_losses,
+        color_by='gradient',
+        log_scale=True,
+        show_floor_contours=True
+    )
+    assert len(fig_gradient.data) == 4
+    assert fig_gradient.data[0].colorbar.title.text == "Gradient Norm (Steepness)"
+    assert fig_gradient.layout.scene.zaxis.title.text == "Loss (Log10)"
+
     # Test saving plotly to HTML
     temp_dir = tempfile.mkdtemp()
     try:
