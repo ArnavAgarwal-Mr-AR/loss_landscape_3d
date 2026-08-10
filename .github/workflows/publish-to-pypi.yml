@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'README.md'
+      - 'step_guide.md'
+      - 'api_reference.md'
+      - 'LICENSE'
+      - 'assets/**'
+      - 'outputs/**'
+      - '.gitignore'
   release:
     types: [published]
 
