@@ -103,3 +103,27 @@ def test_visualizer_matplotlib():
         assert os.path.getsize(img_2d_path) > 0
     finally:
         shutil.rmtree(temp_dir)
+
+
+def test_visualizer_1d():
+    x_coords = np.linspace(-1, 1, 5)
+    y_coords = np.linspace(-1, 1, 5)
+    loss_grid = np.random.randn(5, 5)
+    visualizer = LossLandscapeVisualizer(x_coords, y_coords, loss_grid)
+    
+    alphas = np.linspace(0.0, 1.0, 10)
+    values = np.random.randn(10)
+    
+    fig = visualizer.plot_1d_matplotlib(
+        alphas, values, value_name="Accuracy", title="1D Path", theme='dark'
+    )
+    assert fig is not None
+    
+    temp_dir = tempfile.mkdtemp()
+    try:
+        img_1d_path = os.path.join(temp_dir, "plot_1d.png")
+        visualizer.plot_1d_matplotlib(alphas, values, save_path=img_1d_path)
+        assert os.path.exists(img_1d_path)
+        assert os.path.getsize(img_1d_path) > 0
+    finally:
+        shutil.rmtree(temp_dir)

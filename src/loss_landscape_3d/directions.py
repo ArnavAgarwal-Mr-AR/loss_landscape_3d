@@ -218,3 +218,153 @@ def generate_pca_directions(checkpoints, center_index=-1, center_on_mean=False, 
         trajectory_coords.append((cx, cy))
         
     return dir_x, dir_y, center_state_dict, trajectory_coords
+
+
+def compute_hvp(model, dataloader, criterion, vector_dict, device, max_batches=5):
+    """
+    Computes the Hessian-vector product H * v for a given model, dataloader, and vector.
+    Uses Pearlmutter's algorithm for efficient second-order gradients.
+    """
+    model.zero_grad()
+    params_with_grad = [(name, p) for name, p in model.named_parameters() if p.requires_grad]
+    if not params_with_grad:
+        return {}
+        
+    names = [item[0] for item in params_with_grad]
+    tensors = [item[1] for item in params_with_grad]
+    
+    hvp_tensors = [torch.zeros_like(p) for p in tensors]
+    batch_count = 0
+    
+    # Enable grad computation for Hessian calculations
+    for batch_idx, batch in enumerate(dataloader):
+        if max_batches is not None and batch_idx >= max_batches:
+            break
+            
+        model.zero_grad()
+        
+        if isinstance(batch, (list, tuple)):
+            inputs, targets = batch
+        else:
+            continue
+            
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+        
+        outputs = model(inputs)
+        loss = criterion(outputs, targets)
+        
+        # First backward pass with create_graph=True
+        grads = torch.autograd.grad(loss, tensors, create_graph=True)
+        
+        # Calculate inner product: sum(grad_i * v_i)
+        inner_prod = 0.0
+        for g, name in zip(grads, names):
+            if name in vector_dict:
+                v = vector_dict[name].to(device)
+                inner_prod += torch.sum(g * v)
+                
+        # Second backward pass to get H * v
+        hvp_batch = torch.autograd.grad(inner_prod, tensors)
+        
+        for i, hvp_val in enumerate(hvp_batch):
+            if hvp_val is not None:
+                hvp_tensors[i] += hvp_val.detach()
+                
+        batch_count += 1
+        
+    if batch_count == 0:
+        return {name: torch.zeros_like(p) for name, p in params_with_grad}
+        
+    # Return average HVP over the evaluated batches
+    return {name: hvp_val / batch_count for name, hvp_val in zip(names, hvp_tensors)}
+
+
+def generate_hessian_directions(model, dataloader, criterion, device=None, max_batches=5, max_iter=20, tol=1e-3):
+    """
+    Generates two direction vectors corresponding to the top two eigenvectors of the Hessian matrix.
+    Uses Power Iteration with Deflation.
+    
+    Args:
+        model (torch.nn.Module): The PyTorch model.
+        dataloader (DataLoader): Data loader for gradient evaluations.
+        criterion (callable): Loss function.
+        device (torch.device or str, optional): Device context.
+        max_batches (int): Max batches to average Hessian evaluations over.
+        max_iter (int): Maximum Power Iteration steps.
+        tol (float): Convergence tolerance.
+        
+    Returns:
+        tuple: (dir_x, dir_y, center_state_dict)
+    """
+    import numpy as np
+    
+    if device is None:
+        device = next(model.parameters()).device
+        
+    params_dict = {name: p for name, p in model.named_parameters() if p.requires_grad}
+    if not params_dict:
+        raise ValueError("Model has no trainable parameters to compute Hessian.")
+        
+    def get_norm(v_dict):
+        total_sq = sum(torch.sum(v ** 2).item() for v in v_dict.values())
+        return np.sqrt(total_sq)
+        
+    def normalize_dict(v_dict):
+        norm = get_norm(v_dict)
+        if norm < 1e-10:
+            norm = 1e-10
+        return {k: v / norm for k, v in v_dict.items()}
+        
+    def dot_dict(v1, v2):
+        return sum(torch.sum(v1[k] * v2[k]).item() for k in v1.keys())
+        
+    # 1. Power Iteration for v1 (first eigenvector)
+    v1 = {k: torch.randn_like(p) for k, p in params_dict.items()}
+    v1 = normalize_dict(v1)
+    
+    last_eigenvalue = 0.0
+    for _ in range(max_iter):
+        hvp = compute_hvp(model, dataloader, criterion, v1, device, max_batches)
+        eigenvalue = dot_dict(hvp, v1)
+        v1 = normalize_dict(hvp)
+        
+        if abs(eigenvalue - last_eigenvalue) < tol:
+            break
+        last_eigenvalue = eigenvalue
+        
+    # 2. Power Iteration for v2 (second eigenvector) with deflation
+    v2 = {k: torch.randn_like(p) for k, p in params_dict.items()}
+    dot_v2_v1 = dot_dict(v2, v1)
+    v2 = {k: v2[k] - dot_v2_v1 * v1[k] for k in v2.keys()}
+    v2 = normalize_dict(v2)
+    
+    last_eigenvalue_2 = 0.0
+    for _ in range(max_iter):
+        hvp = compute_hvp(model, dataloader, criterion, v2, device, max_batches)
+        
+        # Deflate: w = w - (w . v1) * v1
+        dot_hvp_v1 = dot_dict(hvp, v1)
+        hvp_deflated = {k: hvp[k] - dot_hvp_v1 * v1[k] for k in hvp.keys()}
+        
+        eigenvalue = dot_dict(hvp_deflated, v2)
+        v2 = normalize_dict(hvp_deflated)
+        
+        if abs(eigenvalue - last_eigenvalue_2) < tol:
+            break
+        last_eigenvalue_2 = eigenvalue
+        
+    # Assemble final direction state dicts
+    center_state_dict = {k: p.data.clone() for k, p in model.named_parameters()}
+    
+    dir_x = {}
+    dir_y = {}
+    for k in center_state_dict.keys():
+        if k in v1:
+            dir_x[k] = v1[k].clone()
+            dir_y[k] = v2[k].clone()
+        else:
+            dir_x[k] = torch.zeros_like(center_state_dict[k])
+            dir_y[k] = torch.zeros_like(center_state_dict[k])
+            
+    return dir_x, dir_y, center_state_dict

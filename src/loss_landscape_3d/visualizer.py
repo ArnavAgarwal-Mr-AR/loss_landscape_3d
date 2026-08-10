@@ -382,3 +382,51 @@ class LossLandscapeVisualizer:
             plt.savefig(save_path, dpi=150, bbox_inches='tight')
             
         return fig
+
+    def plot_1d_matplotlib(self, alphas, values, value_name="Loss", title="1D Path Interpolation", theme='light', save_path=None):
+        """
+        Plots a 1D loss/metric interpolation path curve using Matplotlib.
+        
+        Args:
+            alphas (array-like): 1D array of interpolation coordinates.
+            values (array-like): 1D array of loss or metric values.
+            value_name (str): Y-axis label name (e.g. "Loss" or "Accuracy").
+            title (str): Title of the plot.
+            theme (str): Visual style, 'dark' or 'light' (default).
+            save_path (str, optional): Path to save the PNG file.
+            
+        Returns:
+            matplotlib.figure.Figure: The generated Matplotlib figure object.
+        """
+        import os
+        plt = self._import_matplotlib()
+        
+        if theme == 'dark':
+            plt.style.use('dark_background')
+            text_color = 'white'
+            line_color = '#00FFCC'
+            marker_color = '#FFCC00'
+        else:
+            plt.style.use('default')
+            text_color = 'black'
+            line_color = '#1f77b4'
+            marker_color = '#ff7f0e'
+            
+        fig, ax = plt.subplots(figsize=(8, 5))
+        
+        ax.plot(alphas, values, color=line_color, marker='o', linestyle='-', linewidth=2, markersize=5, label=value_name)
+        
+        ax.set_title(title, fontsize=15, color=text_color)
+        ax.set_xlabel('Interpolation Parameter (Alpha)', color=text_color)
+        ax.set_ylabel(value_name, color=text_color)
+        
+        ax.grid(True, linestyle='--', alpha=0.3)
+        ax.legend()
+        
+        plt.tight_layout()
+        
+        if save_path is not None:
+            os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+            plt.savefig(save_path, dpi=150, bbox_inches='tight')
+            
+        return fig

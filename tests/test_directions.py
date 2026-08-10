@@ -127,3 +127,41 @@ def test_generate_pca_directions_errors():
     # Less than 2 checkpoints
     with pytest.raises(ValueError, match="At least 2 checkpoints"):
         generate_pca_directions([{'w': torch.tensor([1.0])}])
+
+
+def test_generate_hessian_directions():
+    from loss_landscape_3d.directions import generate_hessian_directions
+    from torch.utils.data import TensorDataset, DataLoader
+    
+    torch.manual_seed(42)
+    model = ConvMLPModel()
+    
+    # Create simple dummy dataset
+    x = torch.randn(8, 1, 3, 3)
+    y = torch.randint(0, 4, (8,))
+    dataset = TensorDataset(x, y)
+    dataloader = DataLoader(dataset, batch_size=4)
+    criterion = nn.CrossEntropyLoss()
+    
+    dir_x, dir_y, center = generate_hessian_directions(
+        model, dataloader, criterion, max_batches=2, max_iter=5, tol=1e-2
+    )
+    
+    # 1. Assert keys and types
+    assert dir_x.keys() == model.state_dict().keys()
+    assert dir_y.keys() == model.state_dict().keys()
+    
+    # 2. Check center weights
+    assert torch.allclose(center['fc.weight'], model.state_dict()['fc.weight'])
+    
+    # 3. Check eigenvectors are unit norm (for trainable weights)
+    trainable_keys = [k for k, p in model.named_parameters() if p.requires_grad]
+    flat_x = torch.cat([dir_x[k].flatten() for k in trainable_keys])
+    flat_y = torch.cat([dir_y[k].flatten() for k in trainable_keys])
+    
+    assert torch.allclose(torch.norm(flat_x), torch.tensor(1.0), atol=1e-3)
+    assert torch.allclose(torch.norm(flat_y), torch.tensor(1.0), atol=1e-3)
+    
+    # Check orthogonality
+    dot_prod = torch.dot(flat_x, flat_y).item()
+    assert abs(dot_prod) < 1e-3

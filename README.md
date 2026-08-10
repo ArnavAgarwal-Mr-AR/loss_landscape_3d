@@ -11,6 +11,9 @@ With this library, you can easily:
 *   Track the exact trajectory your optimizer (e.g., SGD, Adam, RMSprop) took during training.
 *   Project high-dimensional optimization trajectories into a 2D coordinate system using an optimized **Gram-matrix SVD** method that works in seconds even for models with millions of parameters.
 *   Generate interactive, beautiful 3D Plotly surface charts showing the optimizer's path down the "loss mountain," highlighting concepts like local minima, saddle points, and flatness.
+*   Compute **Hessian Eigenvector Directions** (second-order curvature) to visualize the sharpest descent directions (worst-case curvature) around local minima.
+*   Compute **1D Path Interpolation (Linear Mode Connectivity)** to analyze the loss and accuracy barrier separating different weight states.
+*   Auto-detect optimal step limits using **Adaptive Step Scaling** to prevent manual coordinate searching.
 
 ---
 
@@ -176,15 +179,21 @@ Extracts two principal components from the trajectory history.
 *   `center_on_mean`: Centers projection at the mean coordinate of the trajectory.
 *   `normalize`: Applies filter-wise normalization. (Default `False` to maintain projection accuracy).
 
+### `generate_hessian_directions(model, dataloader, criterion, device=None, max_batches=5, max_iter=20, tol=1e-3)`
+Computes two projection directions corresponding to the top two eigenvectors of the Hessian matrix (second derivatives of the loss) at a given weight state.
+
 ### `LossLandscapeCalculator(model, dataloader, criterion, device=None)`
 Computes the loss surface grid.
-*   `calculate(x_coords, y_coords, dir_x, dir_y, center_state, max_batches=None)`: Evaluations are done inside `torch.no_grad()`. `max_batches` limits data batches evaluated per point to speed up computation.
+*   `calculate(x_coords, y_coords, dir_x, dir_y, center_state, max_batches=None, metric_fn=None)`: Evaluates the loss (and optional custom metrics) over a 2D perturbation grid.
+*   `calculate_1d_path(alphas, state_dict_1, state_dict_2, max_batches=None, metric_fn=None)`: Evaluates loss (and optional metric) along a 1D linear interpolation path.
+*   `suggest_coordinate_bounds(dir_x, dir_y, center_state, target_loss_factor=5.0, max_batches=None)`: Probes the local curvature to auto-suggest step limits along the direction axes.
 
 ### `LossLandscapeVisualizer(x_coords, y_coords, loss_grid)`
 Handles plots generation.
-*   `plot_3d_plotly(...)`: Generates interactive HTML 3D plot with trajectory lines and hover tooltips.
+*   `plot_3d_plotly(...)`: Generates interactive HTML 3D plot with trajectory lines, floor contours, custom specular lighting, and sequential timeline path markers.
 *   `plot_3d_matplotlib(...)`: Generates static 3D PNG plots.
 *   `plot_contour_matplotlib(...)`: Generates 2D filled contour plots of the loss landscape with overlayed optimizer trajectories.
+*   `plot_1d_matplotlib(...)`: Generates 1D line plots representing mode connectivity paths.
 
 For a detailed parameter list, function signatures, and method descriptions, refer to the [API Reference Guide](api_reference.md).
 

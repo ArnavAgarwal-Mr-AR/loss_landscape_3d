@@ -61,7 +61,29 @@ def generate_pca_directions(checkpoints, center_index=-1, center_on_mean=False, 
 
 ---
 
-### 3. `filter_wise_normalize`
+### 3. `generate_hessian_directions`
+Generates two orthogonal parameter directions corresponding to the top two eigenvectors of the Hessian matrix (second derivatives of the loss) at a given parameter state. Useful for visualizing the landscape along the directions of sharpest curvature.
+
+#### Signature:
+```python
+def generate_hessian_directions(model, dataloader, criterion, device=None, max_batches=5, max_iter=20, tol=1e-3):
+```
+
+#### Parameters:
+*   `model` (*torch.nn.Module*): The PyTorch model to evaluate.
+*   `dataloader` (*DataLoader*): The DataLoader for running forward and backward passes.
+*   `criterion` (*callable*): The loss function.
+*   `device` (*torch.device* or *str*, optional): The computation device. If `None`, it is auto-detected.
+*   `max_batches` (*int*, default=`5`): Maximum number of batches to average the Hessian evaluations over to handle noise.
+*   `max_iter` (*int*, default=`20`): Maximum Power Iteration steps.
+*   `tol` (*float*, default=`1e-3`): Power iteration convergence tolerance.
+
+#### Returns:
+*   *tuple of (dict, dict, dict)*: `(dir_x, dir_y, center_state_dict)` containing the two eigenvector directions and the model's center state weights.
+
+---
+
+### 4. `filter_wise_normalize`
 Applies filter-wise (for 4D Conv weights) or neuron-wise (for 2D Linear weights) normalization to a direction vector relative to a reference model parameter state dict.
 
 #### Signature:
@@ -114,7 +136,7 @@ def __init__(self, model, dataloader, criterion, device=None):
 *   `device` (*torch.device* or *str*, optional): The evaluation device ('cuda' or 'cpu'). If `None`, it is auto-detected from the model's parameters.
 
 #### Methods:
-*   `calculate(x_coords, y_coords, dir_x, dir_y, center_state, max_batches=None)`:
+*   `calculate(x_coords, y_coords, dir_x, dir_y, center_state, max_batches=None, metric_fn=None)`:
     Runs grid perturbations under `torch.no_grad()`, loading and restoring model states automatically.
     *   `x_coords` (*array-like*): 1D array of coordinates for the x-axis grid.
     *   `y_coords` (*array-like*): 1D array of coordinates for the y-axis grid.
@@ -122,7 +144,21 @@ def __init__(self, model, dataloader, criterion, device=None):
     *   `dir_y` (*dict*): The state dict containing the y-axis direction vector.
     *   `center_state` (*dict*): The center state dict (e.g., final weights) corresponding to grid origin $(0,0)$.
     *   `max_batches` (*int*, optional): Limits the number of data batches evaluated per grid point to accelerate calculation on large datasets.
-    *   *Returns*: A 2D NumPy array of shape `(len(x_coords), len(y_coords))` containing the loss values.
+    *   `metric_fn` (*callable*, optional): Custom metric function of signature `(outputs, targets) -> float` to compute alongside the loss.
+    *   *Returns*: A 2D NumPy array containing the loss values if `metric_fn` is `None`. If `metric_fn` is provided, returns a tuple of 2D NumPy arrays `(loss_grid, metric_grid)`.
+*   `calculate_1d_path(alphas, state_dict_1, state_dict_2, max_batches=None, metric_fn=None)`:
+    Evaluates loss and optional metric values along a 1D linear path connecting `state_dict_1` (alpha=0) and `state_dict_2` (alpha=1).
+    *   `alphas` (*array-like*): 1D array of interpolation coordinates.
+    *   `state_dict_1` (*dict*): Starting model state dict.
+    *   `state_dict_2` (*dict*): Ending model state dict.
+    *   `max_batches` / `metric_fn`: Same as above.
+    *   *Returns*: A 1D NumPy array of loss values if `metric_fn` is `None`. If `metric_fn` is provided, returns a tuple of 1D NumPy arrays `(loss_array, metric_array)`.
+*   `suggest_coordinate_bounds(dir_x, dir_y, center_state, target_loss_factor=5.0, max_batches=None)`:
+    Explores along the positive axes of `dir_x` and `dir_y` to find the step size at which the loss increases by `target_loss_factor` relative to the center state.
+    *   `dir_x` (*dict*) / `dir_y` (*dict*): The direction state dicts.
+    *   `center_state` (*dict*): Center state dict.
+    *   `target_loss_factor` (*float*, default=`5.0`): The factor of loss increase to look for.
+    *   *Returns*: A tuple of floats `(x_limit, y_limit)` suggesting appropriate coordinate bounds (e.g. `[-x_limit, x_limit]`).
 
 ---
 
@@ -158,5 +194,12 @@ def __init__(self, x_coords, y_coords, loss_grid):
     Renders a 2D contour map of the loss landscape using Matplotlib, useful for seeing trajectory curves without 3D occlusion.
     *   `trajectory_coords` (*list of tuple*, optional): Optimizer path coordinates to overlay.
     *   `levels` (*int*, default=`25`): Resolution level density of contour lines.
+    *   `title` / `theme` / `save_path`: Same as above.
+    *   *Returns*: A `matplotlib.figure.Figure` object.
+*   `plot_1d_matplotlib(alphas, values, value_name="Loss", title="1D Path Interpolation", theme='light', save_path=None)`:
+    Plots a 1D loss/metric interpolation curve along a linear path parameter using Matplotlib.
+    *   `alphas` (*array-like*): 1D array of interpolation coordinates.
+    *   `values` (*array-like*): 1D array of loss or metric values.
+    *   `value_name` (*str*, default=`"Loss"`): Name of the value to plot on the Y-axis (e.g. `"Accuracy"`).
     *   `title` / `theme` / `save_path`: Same as above.
     *   *Returns*: A `matplotlib.figure.Figure` object.

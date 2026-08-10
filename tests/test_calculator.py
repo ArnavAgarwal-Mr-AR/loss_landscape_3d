@@ -77,3 +77,73 @@ def test_calculator_max_batches():
     )
     
     assert loss_grid.shape == (1, 1)
+
+
+def test_calculator_metrics():
+    model = ToyModel()
+    dataset = ToyDataset(size=10)
+    dataloader = data.DataLoader(dataset, batch_size=2)
+    criterion = nn.MSELoss()
+    original_state = model.state_dict()
+    
+    dir_x = {k: torch.zeros_like(v) for k, v in original_state.items()}
+    dir_y = {k: torch.zeros_like(v) for k, v in original_state.items()}
+    
+    calculator = LossLandscapeCalculator(model, dataloader, criterion, device='cpu')
+    
+    def dummy_metric(outputs, targets):
+        return outputs.sum().item()
+        
+    loss_grid, metric_grid = calculator.calculate(
+        [0.0], [0.0], dir_x, dir_y, original_state, metric_fn=dummy_metric
+    )
+    
+    assert loss_grid.shape == (1, 1)
+    assert metric_grid.shape == (1, 1)
+    assert not np.isnan(metric_grid).any()
+
+
+def test_calculator_1d_path():
+    model = ToyModel()
+    dataset = ToyDataset(size=10)
+    dataloader = data.DataLoader(dataset, batch_size=2)
+    criterion = nn.MSELoss()
+    
+    state_1 = {k: v.clone() for k, v in model.state_dict().items()}
+    state_2 = {k: v.clone() + 1.0 for k, v in model.state_dict().items()}
+    
+    calculator = LossLandscapeCalculator(model, dataloader, criterion, device='cpu')
+    alphas = np.linspace(0.0, 1.0, 5)
+    
+    losses = calculator.calculate_1d_path(alphas, state_1, state_2)
+    assert losses.shape == (5,)
+    assert not np.isnan(losses).any()
+    
+    def dummy_metric(outputs, targets):
+        return outputs.mean().item()
+        
+    losses, metrics = calculator.calculate_1d_path(alphas, state_1, state_2, metric_fn=dummy_metric)
+    assert losses.shape == (5,)
+    assert metrics.shape == (5,)
+
+
+def test_suggest_coordinate_bounds():
+    model = ToyModel()
+    dataset = ToyDataset(size=10)
+    dataloader = data.DataLoader(dataset, batch_size=2)
+    criterion = nn.MSELoss()
+    original_state = model.state_dict()
+    
+    dir_x = {k: torch.randn_like(v) for k, v in original_state.items()}
+    dir_y = {k: torch.randn_like(v) for k, v in original_state.items()}
+    
+    calculator = LossLandscapeCalculator(model, dataloader, criterion, device='cpu')
+    
+    x_limit, y_limit = calculator.suggest_coordinate_bounds(
+        dir_x, dir_y, original_state, target_loss_factor=2.0, max_batches=2
+    )
+    
+    assert x_limit > 0.0
+    assert y_limit > 0.0
+    assert x_limit <= 10.0
+    assert y_limit <= 10.0

@@ -324,3 +324,63 @@ When you load your `loss_landscape_3d.html` file into a web browser, zoom and ro
     *   **Adam**: It might adaptively navigate around saddle points or steep ridges more direct than vanilla SGD.
 3.  **Saddle Points**: Look for regions that slope up in one direction but down in another (like a horse saddle). Optimizers often slow down in these flat regions before finding the escape path.
 4.  **Local Minima**: Look for "craters" separated by ridges of high loss. If you run multiple training sessions with different seeds, you can plot their end-points to compare which minima are flatter. (Flatter minima are generally associated with better generalization).
+
+---
+
+## 🔬 Advanced Diagnostics & Features
+
+The library also exposes advanced features for deeper research into optimization curvature and mode connectivity:
+
+### 1. 1D Path Interpolation (Linear Mode Connectivity)
+Plot the loss and accuracy barriers between two different training states:
+
+```python
+import numpy as np
+from loss_landscape_3d import LossLandscapeCalculator, LossLandscapeVisualizer
+
+# Define two model parameter checkpoints
+state_1 = tracker.get_checkpoints()[0]   # Start
+state_2 = tracker.get_checkpoints()[-1]  # End
+
+# Calculate 1D interpolation
+calculator = LossLandscapeCalculator(model, dataloader, criterion)
+alphas = np.linspace(-0.2, 1.2, 20)
+
+# Track loss along the path
+losses = calculator.calculate_1d_path(alphas, state_1, state_2)
+
+# Plot the 1D path curve
+visualizer = LossLandscapeVisualizer(None, None, None)
+fig = visualizer.plot_1d_matplotlib(
+    alphas, losses, value_name="Loss", title="1D Loss Interpolation Path", save_path="lmc_path.png"
+)
+```
+
+### 2. Auto-Suggesting Step Limits (Adaptive Bounds)
+Avoid flat plateaus or exploded values by automatically searching for step limits:
+
+```python
+# Probes along the direction axes to suggest coordinate limits
+x_limit, y_limit = calculator.suggest_coordinate_bounds(
+    dir_x, dir_y, center_state, target_loss_factor=5.0
+)
+
+# Use the recommended bounds to define grid coords
+x_coords = np.linspace(-x_limit, x_limit, 15)
+y_coords = np.linspace(-y_limit, y_limit, 15)
+```
+
+### 3. Hessian Eigenvector Directions (Sharpness Visualization)
+Compute directions corresponding to the largest second derivatives (highest curvature) at a local minimum:
+
+```python
+from loss_landscape_3d import generate_hessian_directions
+
+# Compute eigenvectors corresponding to sharpest curvature
+dir_x, dir_y, center = generate_hessian_directions(
+    model, dataloader, criterion, max_batches=5, max_iter=15
+)
+
+# Evaluate and visualize the worst-case sharpness landscape
+loss_grid = calculator.calculate(x_coords, y_coords, dir_x, dir_y, center)
+```
