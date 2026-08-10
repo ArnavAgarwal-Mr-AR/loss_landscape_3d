@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: loss_landscape_3d
-Version: 0.1.0
+Version: 0.1.1
 Summary: A library for sampling weight spaces and visualizing PyTorch model loss landscapes and optimization trajectories in interactive 3D.
 Author: Arnav Agarwal
 License-Expression: MIT
