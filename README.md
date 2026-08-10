@@ -7,8 +7,8 @@
 `loss-landscape-3d` is a lightweight, high-performance PyTorch library that samples the weight space of neural networks to generate interactive 3D visualizations of their loss landscapes.
 
 <p align="center">
-  <img src="assets/loss_landscape_3d.png" width="49%" alt="Actual 3D Loss Landscape">
-  <img src="assets/loss_landscape_contours.png" width="49%" alt="Actual 2D Loss Contours">
+  <img src="https://raw.githubusercontent.com/ArnavAgarwal-Mr-AR/loss_landscape_3d/main/assets/loss_landscape_3d.png" width="49%" alt="Actual 3D Loss Landscape">
+  <img src="https://raw.githubusercontent.com/ArnavAgarwal-Mr-AR/loss_landscape_3d/main/assets/loss_landscape_contours.png" width="49%" alt="Actual 2D Loss Contours">
 </p>
 
 With this library, you can easily:
@@ -166,7 +166,7 @@ visualizer.plot_3d_plotly(
 ### 1D Linear Mode Connectivity (LMC) Path Plot
 Additionally, you can calculate and plot the 1D path loss barrier between the initial and final states:
 <p align="center">
-  <img src="assets/lmc_path_1d.png" width="75%" alt="Actual 1D Mode Connectivity Path">
+  <img src="https://raw.githubusercontent.com/ArnavAgarwal-Mr-AR/loss_landscape_3d/main/assets/lmc_path_1d.png" width="75%" alt="Actual 1D Mode Connectivity Path">
 </p>
 
 ---
