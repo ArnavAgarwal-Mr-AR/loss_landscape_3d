@@ -11,7 +11,7 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = {file = "LICENSE"}
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -36,5 +36,5 @@ Repository = "https://github.com/ArnavAgarwal-Mr-AR/loss-landscape-3d"
 "Bug Tracker" = "https://github.com/ArnavAgarwal-Mr-AR/loss-landscape-3d/issues"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["loss_landscape_3d*"]
